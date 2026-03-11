@@ -53,6 +53,7 @@ print("SMART-WATT Event-Based NILM Started")
 # -----------------------------
 power_buffer = deque(maxlen=SMOOTHING_WINDOW)
 last_smoothed_power = None
+last_raw_power = None
 last_event_time = 0.0
 
 appliance_runtime = []
@@ -372,7 +373,7 @@ def update_total_energy(power_w: float, now_ts: float):
 
 
 def on_message(client, userdata, msg):
-    global last_smoothed_power
+    global last_smoothed_power, last_raw_power
 
     try:
         payload_str = msg.payload.decode("utf-8")
@@ -390,11 +391,13 @@ def on_message(client, userdata, msg):
         # build per-second buckets for later 1-minute aggregate
         add_raw_sample_to_second_bucket(now_ts, voltage, current, power)
 
-        # NILM smoothing/event logic
+        # smoothing only for display/monitoring
         smoothed = smooth_power(power)
 
-        if last_smoothed_power is None:
+        if last_raw_power is None:
+            last_raw_power = power
             last_smoothed_power = smoothed
+
             delta_p = 0.0
             detected = current_detected_appliances()
             update_live_reading(voltage, current, power, smoothed, delta_p, detected, None, total_kwh)
@@ -405,14 +408,16 @@ def on_message(client, userdata, msg):
             )
             return
 
-        delta_p = smoothed - last_smoothed_power
+        # RAW delta for event detection
+        delta_p = power - last_raw_power
+
         event = process_event(delta_p, now_ts)
         detected = current_detected_appliances()
 
         print(
             f"V={voltage:.1f}V | I={current:.2f}A | "
             f"P={power:.1f}W | Smooth={smoothed:.1f}W | "
-            f"dP={delta_p:+.1f}W | Energy={total_kwh:.6f} kWh"
+            f"dP(raw)={delta_p:+.1f}W | Energy={total_kwh:.6f} kWh"
         )
 
         if event:
@@ -432,6 +437,7 @@ def on_message(client, userdata, msg):
 
         update_live_reading(voltage, current, power, smoothed, delta_p, detected, event, total_kwh)
 
+        last_raw_power = power
         last_smoothed_power = smoothed
 
     except json.JSONDecodeError:
