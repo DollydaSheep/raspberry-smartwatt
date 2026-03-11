@@ -246,11 +246,7 @@ def update_live_reading(voltage, current, power, smoothed_power, delta_p, applia
         "voltage": float(voltage),
         "current": float(current),
         "power": float(power),
-        "smoothed_power": float(smoothed_power),
-        "delta_power": float(delta_p),
-        "energy_kwh": float(total_kwh),
         "detected_appliances": appliances,
-        "last_event": last_event,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
